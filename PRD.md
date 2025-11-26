@@ -48,32 +48,46 @@ For lights that DON'T support transitions:
 
 **Step Calculation Algorithm:**
 
-Steps are derived from brightness delta, not duration, to prevent API overload and respect HA's integer brightness constraint (0-255).
+Steps are constrained by multiple factors: brightness delta (can't change less than 1%), config limits, and rate limits. The unified algorithm:
 
 ```
 brightness_delta = abs(target - current)
-max_steps = 60  # Cap to prevent excessive API calls
-steps = min(brightness_delta, max_steps)
+
+# Determine maximum steps from all constraints
+max_from_delta = brightness_delta        # Can't exceed brightness points
+max_from_config = 60                     # Config cap
+max_from_rate_limit = (rate_limit_remaining - buffer) if rate_limited else infinity
+
+steps = min(max_from_delta, max_from_config, max_from_rate_limit)
+steps = max(steps, 1)                    # At least 1 step
+
+# Calculate timing
 interval = duration / steps
-interval = max(interval, min_step_interval)  # Enforce minimum interval
+interval = max(interval, min_step_interval)  # Enforce minimum 1 second
+
+# Calculate brightness change per step
+brightness_per_step = brightness_delta / steps
 ```
 
 **Constraints:**
-- Minimum step interval: **1 second** (configurable)
-- Maximum steps per transition: **60** (prevents long transitions from flooding APIs)
+- Minimum step interval: **1 second** (configurable, enforced)
+- Maximum steps per transition: **60** (config cap, prevents API flooding)
 - Minimum brightness delta per step: **1%** (HA integer constraint)
+- Rate limit buffer: **10** (preserve this many API calls)
 
-**Examples:**
+**Examples (no rate limit):**
 
-| Transition | Brightness Change | Steps | Interval | Delta/Step |
-|------------|-------------------|-------|----------|------------|
+| Transition | Brightness Δ | Steps | Interval | Δ/Step |
+|------------|--------------|-------|----------|--------|
 | 0→100% in 4s | 100% | 4 | 1s | 25% |
 | 0→100% in 60s | 100% | 60 | 1s | ~1.7% |
-| 0→100% in 600s (10min) | 100% | 60 (capped) | 10s | ~1.7% |
-| 0→10% in 4s | 10% | 10 | 1s* | 1% |
-| 50→60% in 4s | 10% | 10 | 1s* | 1% |
+| 0→100% in 600s | 100% | 60 (capped) | 10s | ~1.7% |
+| 0→10% in 4s | 10% | 4 | 1s | 2.5% |
+| 50→60% in 4s | 10% | 4 | 1s | 2.5% |
 
-*When calculated interval < min_step_interval, actual duration extends beyond requested duration to maintain smooth steps.
+**Examples (with rate limit):** See Section 4.
+
+*When calculated interval < min_step_interval, actual duration extends to maintain smooth steps.
 
 **2.3 Transition Parameter Passthrough**
 
@@ -121,26 +135,32 @@ actual_duration = configured_duration * (abs(target - current) / 100)
 Check if light entity has `rate_limit_remaining` attribute (e.g., Govee lights).
 
 **Behavior:**
-- Read current `rate_limit_remaining` value
-- Calculate safe step count to leave ≥10 remaining
-- Adjust step interval accordingly
+- Read `rate_limit_remaining` value
+- Calculate safe steps: `safe_steps = rate_limit_remaining - buffer`
+- Use as constraint in unified algorithm (Section 2.2)
 
-**Formula:**
+**Examples:**
+
+| Brightness Δ | Duration | Rate Limit | Safe Steps | Steps | Interval | Δ/Step |
+|--------------|----------|------------|------------|-------|----------|--------|
+| 100% | 60s | 70 | 60 | 60 | 1s | ~1.7% |
+| 100% | 60s | 30 | 20 | 20 | 3s | 5% |
+| 100% | 60s | 15 | 5 | 5 | 12s | 20% |
+| 100% | 4s | 30 | 20 | 4 | 1s | 25% |
+
+**Detailed Example:**
 ```
-safe_steps = rate_limit_remaining - 10
-step_interval = max(1, configured_duration / safe_steps)
+100% → 0% over 60s, rate_limit_remaining = 30, buffer = 10
+
+safe_steps = 30 - 10 = 20
+steps = min(100, 60, 20) = 20  # Rate limit constrains
+interval = 60s / 20 = 3s
+brightness_per_step = 100% / 20 = 5%
+
+Timeline: 100% → 95% → 90% → ... → 0% (20 steps @ 3s)
 ```
 
-**Example:**
-```
-Rate limit remaining: 45
-Safe steps: 35
-Configured duration: 4 seconds
-Step interval: max(1, 4/35) = 1 second
-Adjusted steps: 4 (use fewer steps to respect rate limit)
-```
-
-**Fallback:** If rate limit < 2, skip transition and execute command immediately.
+**Fallback:** If `rate_limit_remaining ≤ buffer + 1`, skip manual transition and execute immediately.
 
 ### 5. Manual Control Detection
 
