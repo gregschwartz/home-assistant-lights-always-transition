@@ -55,6 +55,23 @@ Brightness per step: 25%
 Timeline: 0% → 25% → 50% → 75% → 100%
 ```
 
+**2.3 Transition Parameter Passthrough**
+
+For lights that DON'T support transitions but receive a `transition` parameter (e.g., from a script or automation):
+- Detect the incoming `transition` value before stripping it
+- Use that duration for manual stepping instead of the default
+- This allows scripts to specify custom durations even for non-transition lights
+
+**Example:**
+```yaml
+# Script calls:
+service: light.turn_on
+target:
+  entity_id: light.non_transition_bulb
+data:
+  transition: 10  # Use 10 seconds, not default 4
+```
+
 ### 3. Proportional Transition Scaling
 
 **Requirement:** Scale transition duration based on brightness change magnitude.
