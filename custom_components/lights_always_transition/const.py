@@ -1,6 +1,6 @@
-"""Constants for Smooth Lights."""
+"""Constants for Lights Always Transition."""
 
-DOMAIN = "smooth_lights"
+DOMAIN = "lights_always_transition"
 
 # Configuration
 CONF_TRANSITION_TIME = "transition_time"

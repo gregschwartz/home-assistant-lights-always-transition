@@ -1,4 +1,4 @@
-# Smooth Lights
+# Lights Always Transition
 
 Automatically adds smooth fade-up transitions to ALL lights in Home Assistant.
 

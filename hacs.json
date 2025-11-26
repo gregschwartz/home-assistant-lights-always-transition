@@ -1,5 +1,5 @@
 {
-  "name": "Smooth Lights",
+  "name": "Lights Always Transition",
   "render_readme": true,
   "homeassistant": "2024.1.0"
 }

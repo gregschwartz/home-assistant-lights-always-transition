@@ -1,4 +1,4 @@
-"""Smooth Lights integration."""
+"""Lights Always Transition integration."""
 from __future__ import annotations
 
 import logging
@@ -22,7 +22,7 @@ PLATFORMS: list[Platform] = []
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Smooth Lights from a config entry."""
+    """Set up Lights Always Transition from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
     # Get configuration
@@ -69,7 +69,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     _LOGGER.info(
-        "Smooth Lights initialized with %s second transition", transition_time
+        "Lights Always Transition initialized with %s second transition", transition_time
     )
 
     return True
@@ -83,6 +83,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         remove_interceptor()
         hass.data[DOMAIN].pop(entry.entry_id)
 
-    _LOGGER.info("Smooth Lights unloaded")
+    _LOGGER.info("Lights Always Transition unloaded")
 
     return True

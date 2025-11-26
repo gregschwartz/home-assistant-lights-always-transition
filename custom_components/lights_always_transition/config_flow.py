@@ -1,4 +1,4 @@
-"""Config flow for Smooth Lights."""
+"""Config flow for Lights Always Transition."""
 from __future__ import annotations
 
 from typing import Any
@@ -13,8 +13,8 @@ import homeassistant.helpers.config_validation as cv
 from .const import CONF_EXCLUDE_ENTITIES, CONF_TRANSITION_TIME, DEFAULT_TRANSITION_TIME, DOMAIN
 
 
-class SmoothLightsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Smooth Lights."""
+class LightsAlwaysTransitionConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Lights Always Transition."""
 
     VERSION = 1
 
@@ -27,7 +27,7 @@ class SmoothLightsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # Create the entry
             return self.async_create_entry(
-                title="Smooth Lights",
+                title="Lights Always Transition",
                 data=user_input,
             )
 
@@ -51,13 +51,13 @@ class SmoothLightsConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
-    ) -> SmoothLightsOptionsFlow:
+    ) -> LightsAlwaysTransitionOptionsFlow:
         """Get the options flow for this handler."""
-        return SmoothLightsOptionsFlow(config_entry)
+        return LightsAlwaysTransitionOptionsFlow(config_entry)
 
 
-class SmoothLightsOptionsFlow(config_entries.OptionsFlow):
-    """Handle options flow for Smooth Lights."""
+class LightsAlwaysTransitionOptionsFlow(config_entries.OptionsFlow):
+    """Handle options flow for Lights Always Transition."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""

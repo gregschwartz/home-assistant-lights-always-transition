@@ -1,4 +1,4 @@
-# Smooth Lights for Home Assistant
+# Lights Always Transition for Home Assistant
 
 Automatically adds smooth fade-up transitions to all lights in Home Assistant without modifying individual automations or scripts.
 
@@ -18,16 +18,16 @@ This component intercepts `light.turn_on` service calls before they execute. If 
 
 ### Manual Installation
 
-1. Copy the `smooth_lights` folder to your Home Assistant `custom_components` directory:
+1. Copy the `lights_always_transition` folder to your Home Assistant `custom_components` directory:
    ```
-   <config>/custom_components/smooth_lights/
+   <config>/custom_components/lights_always_transition/
    ```
 
 2. Restart Home Assistant
 
 3. Go to **Settings** → **Devices & Services** → **Add Integration**
 
-4. Search for "Smooth Lights" and follow the setup wizard
+4. Search for "Lights Always Transition" and follow the setup wizard
 
 ### Configuration
 
@@ -41,7 +41,7 @@ During setup, you can configure:
 To modify settings after installation:
 
 1. Go to **Settings** → **Devices & Services**
-2. Find "Smooth Lights" in your integrations
+2. Find "Lights Always Transition" in your integrations
 3. Click **Configure**
 4. Update your settings and save
 
@@ -89,10 +89,10 @@ data:
 ## Uninstallation
 
 1. Go to **Settings** → **Devices & Services**
-2. Find "Smooth Lights" in your integrations
+2. Find "Lights Always Transition" in your integrations
 3. Click the three dots menu → **Delete**
 4. Restart Home Assistant
-5. Remove the `custom_components/smooth_lights` folder
+5. Remove the `custom_components/lights_always_transition` folder
 
 ## Technical Details
 
