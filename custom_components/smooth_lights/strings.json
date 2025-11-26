@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure Smooth Lights",
+        "description": "Automatically add fade-up transitions when turning on lights",
+        "data": {
+          "transition_time": "Transition time (seconds)",
+          "exclude_entities": "Exclude entities (optional)"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Smooth Lights Options",
+        "description": "Configure transition settings",
+        "data": {
+          "transition_time": "Transition time (seconds)",
+          "exclude_entities": "Exclude entities (optional)"
+        }
+      }
+    }
+  }
+}
