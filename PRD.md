@@ -11,6 +11,8 @@
 
 Home Assistant lights turn on/off instantly by default, creating jarring lighting changes. While transition parameters exist, they must be manually specified in every automation, script, and UI interaction. Users want smooth, natural lighting transitions without modifying existing automations or infrastructure.
 
+Further, some lights don't support transitions, so this integration patches that functionality.
+
 ## Solution
 
 A custom Home Assistant integration that automatically applies smooth fade transitions to all light operations by intercepting `light.turn_on` and `light.turn_off` service calls.
@@ -26,7 +28,7 @@ A custom Home Assistant integration that automatically applies smooth fade trans
 - Process calls before they reach the light integration
 - Support both single and multiple entity targets
 
-### 2. Dual-Mode Transition Support
+### 2. Dual-Mode Transition Support 
 
 **Requirement:** Support both native transitions and manual step-based transitions.
 
@@ -43,17 +45,35 @@ For lights that DON'T support transitions:
 - Detect lack of transition support via light capabilities
 - Implement manual brightness stepping
 - Step brightness from current → target over configured duration
-- Minimum step interval: **1 second**
-- Calculate step count: `duration_seconds / 1`
-- Calculate brightness delta per step: `(target - current) / step_count`
 
-**Example:**
+**Step Calculation Algorithm:**
+
+Steps are derived from brightness delta, not duration, to prevent API overload and respect HA's integer brightness constraint (0-255).
+
 ```
-Transition: 4 seconds, 0% → 100%
-Steps: 4 (at 1-second intervals)
-Brightness per step: 25%
-Timeline: 0% → 25% → 50% → 75% → 100%
+brightness_delta = abs(target - current)
+max_steps = 60  # Cap to prevent excessive API calls
+steps = min(brightness_delta, max_steps)
+interval = duration / steps
+interval = max(interval, min_step_interval)  # Enforce minimum interval
 ```
+
+**Constraints:**
+- Minimum step interval: **1 second** (configurable)
+- Maximum steps per transition: **60** (prevents long transitions from flooding APIs)
+- Minimum brightness delta per step: **1%** (HA integer constraint)
+
+**Examples:**
+
+| Transition | Brightness Change | Steps | Interval | Delta/Step |
+|------------|-------------------|-------|----------|------------|
+| 0→100% in 4s | 100% | 4 | 1s | 25% |
+| 0→100% in 60s | 100% | 60 | 1s | ~1.7% |
+| 0→100% in 600s (10min) | 100% | 60 (capped) | 10s | ~1.7% |
+| 0→10% in 4s | 10% | 10 | 1s* | 1% |
+| 50→60% in 4s | 10% | 10 | 1s* | 1% |
+
+*When calculated interval < min_step_interval, actual duration extends beyond requested duration to maintain smooth steps.
 
 **2.3 Transition Parameter Passthrough**
 
@@ -82,22 +102,23 @@ actual_duration = configured_duration * (abs(target - current) / 100)
 ```
 
 **Examples:**
-- Configured: 4 seconds
-- 0% → 100%: 4 seconds (100% change)
-- 25% → 0%: 1 second (25% change)
-- 50% → 100%: 2 seconds (50% change)
-- 75% → 25%: 2 seconds (50% change)
+- Default Transition: 4 seconds
+- 0% brightness → 100%: 4 seconds (100% change)
+- If a light is at 25% brightness → 0%: 1 second (25% change)
+- 50% brightness → 100%: 2 seconds (50% change)
+- 75% brightness → 25%: 2 seconds (50% change)
 
 **Constraints:**
 - Minimum duration: 1 second (even for small changes)
 - Round to nearest second
+- Minimum brightness delta is 1%
 
 ### 4. Rate Limit Awareness (Govee Integration)
 
 **Requirement:** Respect API rate limits for cloud-based integrations.
 
 **Detection:**
-Check if light entity has `rate_limit_remaining` attribute (Govee lights).
+Check if light entity has `rate_limit_remaining` attribute (e.g., Govee lights).
 
 **Behavior:**
 - Read current `rate_limit_remaining` value
@@ -119,16 +140,17 @@ Step interval: max(1, 4/35) = 1 second
 Adjusted steps: 4 (use fewer steps to respect rate limit)
 ```
 
-**Fallback:** If rate limit < 15, skip transition and execute command immediately.
+**Fallback:** If rate limit < 2, skip transition and execute command immediately.
 
 ### 5. Manual Control Detection
 
 **Requirement:** Stop ongoing transitions when user manually changes light state.
 
 **Triggers for Cancellation:**
-- Any `light.turn_on` call with brightness/color specified
-- Any `light.turn_off` call
-- State change from external source (physical switch, other automation)
+If a light that is currently having a manual transition applied gets:
+- A `light.turn_on` call
+- A `light.turn_off` call
+- A state change from external source (physical switch, other automation)
 
 **Implementation:**
 - Listen to `state_changed` events for lights in transition
@@ -154,7 +176,8 @@ Adjusted steps: 4 (use fewer steps to respect rate limit)
 |---------|------|---------|-------|-------------|
 | `transition_time` | float | 4.0 | 0-60 | Default transition duration (seconds) |
 | `exclude_entities` | list | [] | - | Light entities to skip |
-| `min_step_interval` | float | 1.0 | 0.1-5.0 | Minimum time between brightness steps |
+| `min_step_interval` | float | 1.0 | 0.5-5.0 | Minimum time between brightness steps |
+| `max_steps` | int | 60 | 10-120 | Maximum steps per manual transition |
 | `rate_limit_buffer` | int | 10 | 0-50 | Remaining rate limit to preserve |
 
 **UI Requirements:**
@@ -197,7 +220,7 @@ active_transitions = {
 
 **Light Availability:**
 - Check if light is available before starting transition
-- Cancel transition if light becomes unavailable mid-transition
+- If light becomes unavailable mid-transition, continue trying until transition duration ends in case it comes back
 - Handle connection errors gracefully
 
 **Edge Cases:**
@@ -227,8 +250,7 @@ active_transitions = {
 
 ## Success Metrics
 
-1. **Adoption:** 100+ HACS installs within 3 months
-2. **Reliability:** <1% error rate in transition execution
+1. **Reliability:** <1% error rate in transition execution
 3. **Performance:** No user-reported slowdowns
 4. **Compatibility:** Works with 90%+ of popular light integrations
 
@@ -261,26 +283,6 @@ active_transitions = {
 4. **Config Flow** (`config_flow.py`)
    - UI configuration
    - Options flow
-
-### Event Flow
-
-```
-1. User: light.turn_on(entity_id="light.bedroom")
-2. Interceptor: Capture call
-3. Interceptor: Check if transition needed
-4. Interceptor: Calculate scaled duration
-5. Transition Manager: Check light capabilities
-6. If native support:
-   a. Add transition parameter
-   b. Pass to original handler
-7. If manual mode needed:
-   a. Pass immediate call with current brightness
-   b. Start async step transition
-   c. Monitor for cancellation
-8. State Monitor: Listen for changes
-9. On manual change: Cancel transition
-10. On completion: Cleanup
-```
 
 ## Testing Strategy
 
@@ -355,8 +357,3 @@ active_transitions = {
 - **HA Standards:** Follows integration quality scale
 - **Privacy:** No data collection, 100% local
 
----
-
-**Approval Status:** Draft
-**Next Review:** After initial implementation
-**Stakeholder:** Greg Schwartz
